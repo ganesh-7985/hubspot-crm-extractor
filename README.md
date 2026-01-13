@@ -2,6 +2,14 @@
 
 A Chrome Extension that extracts Contacts, Deals, and Tasks from HubSpot CRM using intelligent DOM scraping. All data is stored locally in your browser with a modern React-powered dashboard.
 
+## Screenshots
+
+![Extension Popup Interface](icons/img1.png)
+*Extension popup showing extracted contacts, deals, and tasks with search and export functionality*
+
+![Data Extraction in Action](icons/img2.png)
+*Real-time extraction status indicator on HubSpot CRM pages*
+
 ## Features
 
 ### Core Functionality
