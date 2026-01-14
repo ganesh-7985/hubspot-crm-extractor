@@ -21,7 +21,6 @@ export class ContactsExtractor {
   async extract() {
     const contacts = [];
     
-    // Locate the contacts table on the page
     const table = this.findTable();
     if (!table) {
       console.warn('[Contacts Extractor] No table found');
@@ -31,7 +30,6 @@ export class ContactsExtractor {
     const rows = this.getRows(table);
     console.log(`[Contacts Extractor] Found ${rows.length} rows`);
 
-    // Process each contact row
     for (const row of rows) {
       try {
         const contact = this.extractContactFromRow(row);
@@ -60,7 +58,6 @@ export class ContactsExtractor {
     for (const selector of this.rowSelectors) {
       const rows = table.querySelectorAll(selector);
       if (rows.length > 0) {
-        // Filter out header rows and empty rows
         return Array.from(rows).filter(row => {
           return !row.closest('thead') && 
                  !row.querySelector('th') &&
@@ -75,7 +72,6 @@ export class ContactsExtractor {
     const cells = row.querySelectorAll('td, [role="cell"]');
     if (cells.length < 2) return null;
 
-    // Generate or extract unique identifier for this contact
     const rowId = row.getAttribute('data-row-id') || 
                   row.getAttribute('data-test-id') ||
                   this.generateId(row);
@@ -96,7 +92,6 @@ export class ContactsExtractor {
   }
 
   extractName(row, cells) {
-    // Try specific selectors first for better accuracy
     const nameSelectors = [
       '[data-test-id="contact-name"]',
       '[data-selenium-test="contact-name"]',
@@ -125,7 +120,6 @@ export class ContactsExtractor {
   }
 
   extractEmail(row, cells) {
-    // Look for email in specific data attributes or mailto links
     const emailSelectors = [
       '[data-test-id="email"]',
       '[data-selenium-test="email"]',
@@ -158,7 +152,6 @@ export class ContactsExtractor {
   }
 
   extractPhone(row, cells) {
-    // Look for phone in specific data attributes or tel links
     const phoneSelectors = [
       '[data-test-id="phone"]',
       '[data-selenium-test="phone"]',
@@ -226,13 +219,11 @@ export class ContactsExtractor {
   }
 
   looksLikePhone(str) {
-    // Check if string has a reasonable number of digits for a phone number
     const digits = str.replace(/\D/g, '');
     return digits.length >= 7 && digits.length <= 15;
   }
 
   generateId(row) {
-    // Create a simple hash from row content for unique ID
     const text = row.textContent?.substring(0, 100) || '';
     let hash = 0;
     for (let i = 0; i < text.length; i++) {

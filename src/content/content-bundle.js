@@ -654,10 +654,22 @@ class HubSpotExtractor {
     const url = window.location.href;
     const pathname = window.location.pathname;
 
-    if (pathname.includes('/contacts/') || url.includes('objectTypeId=0-1')) {
+    // Check objectTypeId first (more reliable than pathname)
+    if (url.includes('objectTypeId=0-1')) {
       return { view: 'contacts', detected: true };
     }
-    if (pathname.includes('/deals/') || url.includes('objectTypeId=0-3')) {
+    if (url.includes('objectTypeId=0-3')) {
+      return { view: 'deals', detected: true };
+    }
+    if (url.includes('objectTypeId=0-27')) {
+      return { view: 'tasks', detected: true };
+    }
+
+    // Fall back to pathname check
+    if (pathname.includes('/contacts/') && url.includes('/objects/0-1/')) {
+      return { view: 'contacts', detected: true };
+    }
+    if (pathname.includes('/deals/') || url.includes('/objects/0-3/')) {
       return { view: 'deals', detected: true };
     }
     if (pathname.includes('/tasks/')) {
