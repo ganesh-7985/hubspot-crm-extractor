@@ -1,9 +1,4 @@
-/**
- * Deals Extractor
- * Extracts deal data from HubSpot Deals list view
- * 
- * Target fields: deal name, amount, stage, close date
- */
+// Extracts deal data from HubSpot Deals list view
 
 export class DealsExtractor {
   constructor() {
@@ -22,7 +17,6 @@ export class DealsExtractor {
       'tr[data-row-id]'
     ];
 
-    // Deal board selectors (kanban view)
     this.boardSelectors = [
       '.deal-board',
       '[data-test-id="deal-board"]',
@@ -30,19 +24,16 @@ export class DealsExtractor {
     ];
   }
 
-  /**
-   * Extract all deals from the current page
-   */
   async extract() {
     const deals = [];
-
-    // Check if we're in board view or table view
+    
+    // Check if we're in kanban board view first
     const board = this.findBoard();
     if (board) {
       return this.extractFromBoard(board);
     }
 
-    // Table view extraction
+    // Fall back to table view if no board found
     const table = this.findTable();
     if (!table) {
       console.warn('[Deals Extractor] No table or board found');
@@ -52,6 +43,7 @@ export class DealsExtractor {
     const rows = this.getRows(table);
     console.log(`[Deals Extractor] Found ${rows.length} rows`);
 
+    // Extract data from each table row
     for (const row of rows) {
       try {
         const deal = this.extractDealFromRow(row);
@@ -66,9 +58,6 @@ export class DealsExtractor {
     return deals;
   }
 
-  /**
-   * Find the deals table element
-   */
   findTable() {
     for (const selector of this.tableSelectors) {
       const table = document.querySelector(selector);
@@ -77,9 +66,6 @@ export class DealsExtractor {
     return null;
   }
 
-  /**
-   * Find deal board (kanban view)
-   */
   findBoard() {
     for (const selector of this.boardSelectors) {
       const board = document.querySelector(selector);
@@ -88,9 +74,6 @@ export class DealsExtractor {
     return null;
   }
 
-  /**
-   * Get all data rows from the table
-   */
   getRows(table) {
     for (const selector of this.rowSelectors) {
       const rows = table.querySelectorAll(selector);
@@ -105,13 +88,10 @@ export class DealsExtractor {
     return [];
   }
 
-  /**
-   * Extract deals from board/kanban view
-   */
   extractFromBoard(board) {
     const deals = [];
     
-    // Find all deal cards
+    // Find all deal cards in the kanban board
     const cardSelectors = [
       '[data-test-id="deal-card"]',
       '.deal-card',
@@ -125,7 +105,7 @@ export class DealsExtractor {
       if (cards.length > 0) break;
     }
 
-    // Get stage columns
+    // Map each card to its stage/column
     const columns = board.querySelectorAll(
       '[data-test-id="pipeline-column"],' +
       '.pipeline-column,' +
@@ -160,9 +140,6 @@ export class DealsExtractor {
     return deals;
   }
 
-  /**
-   * Extract deal from a board card
-   */
   extractDealFromCard(card, stageName) {
     const id = card.getAttribute('data-deal-id') ||
                card.getAttribute('data-test-id') ||
@@ -200,9 +177,6 @@ export class DealsExtractor {
     };
   }
 
-  /**
-   * Extract deal data from a table row
-   */
   extractDealFromRow(row) {
     const cells = row.querySelectorAll('td, [role="cell"]');
     if (cells.length < 2) return null;
@@ -226,9 +200,6 @@ export class DealsExtractor {
     };
   }
 
-  /**
-   * Extract deal name
-   */
   extractName(row, cells) {
     const nameSelectors = [
       '[data-test-id="deal-name"]',
@@ -257,9 +228,6 @@ export class DealsExtractor {
     return null;
   }
 
-  /**
-   * Extract amount from row
-   */
   extractAmountFromRow(row, cells) {
     const amountSelectors = [
       '[data-test-id="amount"]',
@@ -274,7 +242,6 @@ export class DealsExtractor {
       }
     }
 
-    // Look for currency pattern in cells
     for (const cell of cells) {
       const amount = this.extractAmount(cell.textContent);
       if (amount !== null) return amount;
@@ -283,13 +250,10 @@ export class DealsExtractor {
     return null;
   }
 
-  /**
-   * Extract numeric amount from text
-   */
   extractAmount(text) {
     if (!text) return null;
     
-    // Match currency amounts like $1,234.56 or 1234.56 or €1.234,56
+    // Match various currency formats like $1,234.56 or €1.234,56
     const patterns = [
       /[\$€£¥]\s*[\d,]+\.?\d*/,
       /[\d,]+\.?\d*\s*[\$€£¥]/,
@@ -299,7 +263,7 @@ export class DealsExtractor {
     for (const pattern of patterns) {
       const match = text.match(pattern);
       if (match) {
-        // Remove currency symbols and convert to number
+        // Strip currency symbols and convert to number
         const numStr = match[0].replace(/[^\d.,]/g, '').replace(',', '');
         const num = parseFloat(numStr);
         if (!isNaN(num)) return num;
@@ -309,9 +273,6 @@ export class DealsExtractor {
     return null;
   }
 
-  /**
-   * Extract deal stage
-   */
   extractStage(row, cells) {
     const stageSelectors = [
       '[data-test-id="stage"]',
@@ -328,7 +289,6 @@ export class DealsExtractor {
       }
     }
 
-    // Look for column with "stage" in header
     const headers = document.querySelectorAll('th, [role="columnheader"]');
     let stageIndex = -1;
     headers.forEach((header, index) => {
@@ -344,9 +304,6 @@ export class DealsExtractor {
     return null;
   }
 
-  /**
-   * Extract close date
-   */
   extractCloseDate(row, cells) {
     const dateSelectors = [
       '[data-test-id="close-date"]',
@@ -362,7 +319,6 @@ export class DealsExtractor {
       }
     }
 
-    // Look for column with "close" or "date" in header
     const headers = document.querySelectorAll('th, [role="columnheader"]');
     let dateIndex = -1;
     headers.forEach((header, index) => {
@@ -379,15 +335,12 @@ export class DealsExtractor {
     return null;
   }
 
-  /**
-   * Extract and normalize date
-   */
   extractDate(text) {
     if (!text) return '';
     
     const trimmed = text.trim();
     
-    // Try to parse various date formats
+    // Try to match common date formats
     const datePatterns = [
       /\d{4}-\d{2}-\d{2}/,           // ISO: 2024-01-15
       /\d{1,2}\/\d{1,2}\/\d{2,4}/,   // US: 1/15/2024
@@ -402,12 +355,9 @@ export class DealsExtractor {
       }
     }
 
-    return trimmed.substring(0, 20); // Return first 20 chars as fallback
+    return trimmed.substring(0, 20);
   }
 
-  /**
-   * Generate unique ID
-   */
   generateId(element) {
     const text = element.textContent?.substring(0, 100) || '';
     let hash = 0;

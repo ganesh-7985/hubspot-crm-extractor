@@ -1,9 +1,4 @@
-/**
- * Tasks Extractor
- * Extracts task data from HubSpot Tasks list view
- * 
- * Target fields: title, due date, task type, associated record
- */
+// Extracts task data from HubSpot Tasks list view
 
 export class TasksExtractor {
   constructor() {
@@ -24,7 +19,6 @@ export class TasksExtractor {
       'tr[data-row-id]'
     ];
 
-    // Task list view selectors (non-table view)
     this.listSelectors = [
       '.tasks-list',
       '[data-test-id="tasks-list"]',
@@ -32,19 +26,16 @@ export class TasksExtractor {
     ];
   }
 
-  /**
-   * Extract all tasks from the current page
-   */
   async extract() {
     const tasks = [];
-
-    // Check for list view first
+    
+    // Check if tasks are displayed in list view
     const list = this.findList();
     if (list) {
       return this.extractFromList(list);
     }
 
-    // Table view extraction
+    // Fall back to table view if no list found
     const table = this.findTable();
     if (!table) {
       console.warn('[Tasks Extractor] No table or list found');
@@ -68,9 +59,6 @@ export class TasksExtractor {
     return tasks;
   }
 
-  /**
-   * Find the tasks table element
-   */
   findTable() {
     for (const selector of this.tableSelectors) {
       const table = document.querySelector(selector);
@@ -79,9 +67,6 @@ export class TasksExtractor {
     return null;
   }
 
-  /**
-   * Find tasks list (non-table view)
-   */
   findList() {
     for (const selector of this.listSelectors) {
       const list = document.querySelector(selector);
@@ -90,9 +75,6 @@ export class TasksExtractor {
     return null;
   }
 
-  /**
-   * Get all data rows from the table
-   */
   getRows(table) {
     for (const selector of this.rowSelectors) {
       const rows = table.querySelectorAll(selector);
@@ -107,12 +89,10 @@ export class TasksExtractor {
     return [];
   }
 
-  /**
-   * Extract tasks from list view
-   */
   extractFromList(list) {
     const tasks = [];
     
+    // Find individual task items in the list
     const itemSelectors = [
       '[data-test-id="task-item"]',
       '.task-item',
@@ -141,9 +121,6 @@ export class TasksExtractor {
     return tasks;
   }
 
-  /**
-   * Extract task from a list item
-   */
   extractTaskFromListItem(item) {
     const id = item.getAttribute('data-task-id') ||
                item.getAttribute('data-test-id') ||
@@ -190,13 +167,11 @@ export class TasksExtractor {
     };
   }
 
-  /**
-   * Extract task data from a table row
-   */
   extractTaskFromRow(row) {
     const cells = row.querySelectorAll('td, [role="cell"]');
     if (cells.length < 2) return null;
 
+    // Generate or extract unique identifier for this task
     const rowId = row.getAttribute('data-row-id') || 
                   row.getAttribute('data-test-id') ||
                   this.generateId(row);
@@ -216,10 +191,8 @@ export class TasksExtractor {
     };
   }
 
-  /**
-   * Extract task title
-   */
   extractTitle(row, cells) {
+    // Look for task title in specific data attributes or links
     const titleSelectors = [
       '[data-test-id="task-title"]',
       '[data-test-id="title"]',
@@ -236,13 +209,12 @@ export class TasksExtractor {
       }
     }
 
-    // Checkbox might be first, so try second cell
     const firstLink = row.querySelector('td a, [role="cell"] a');
     if (firstLink?.textContent?.trim()) {
       return firstLink.textContent.trim();
     }
 
-    // Try first non-checkbox cell
+    // Try first non-checkbox cell as fallback
     for (const cell of cells) {
       const text = cell.textContent?.trim();
       if (text && text.length > 2 && !cell.querySelector('input[type="checkbox"]')) {
@@ -253,9 +225,6 @@ export class TasksExtractor {
     return null;
   }
 
-  /**
-   * Extract due date
-   */
   extractDueDate(row, cells) {
     const dateSelectors = [
       '[data-test-id="due-date"]',
@@ -271,7 +240,6 @@ export class TasksExtractor {
       }
     }
 
-    // Look for column with "due" in header
     const headers = document.querySelectorAll('th, [role="columnheader"]');
     let dateIndex = -1;
     headers.forEach((header, index) => {
@@ -285,7 +253,6 @@ export class TasksExtractor {
       return this.extractDate(cells[dateIndex].textContent);
     }
 
-    // Search all cells for date patterns
     for (const cell of cells) {
       const date = this.extractDate(cell.textContent);
       if (date && date !== cell.textContent?.trim()) {
@@ -296,9 +263,6 @@ export class TasksExtractor {
     return null;
   }
 
-  /**
-   * Extract task type
-   */
   extractType(row, cells) {
     const typeSelectors = [
       '[data-test-id="task-type"]',
@@ -314,7 +278,6 @@ export class TasksExtractor {
       }
     }
 
-    // Look for column with "type" in header
     const headers = document.querySelectorAll('th, [role="columnheader"]');
     let typeIndex = -1;
     headers.forEach((header, index) => {
@@ -327,14 +290,11 @@ export class TasksExtractor {
       return cells[typeIndex].textContent?.trim() || '';
     }
 
-    // Infer type from content
     return this.inferTaskType(row);
   }
 
-  /**
-   * Infer task type from content
-   */
   inferTaskType(element) {
+    // Guess task type based on keywords in the content
     const text = element.textContent?.toLowerCase() || '';
     
     if (text.includes('call') || text.includes('phone')) return 'Call';
@@ -345,9 +305,6 @@ export class TasksExtractor {
     return 'To-do';
   }
 
-  /**
-   * Extract associated record
-   */
   extractAssociatedRecord(row, cells) {
     const recordSelectors = [
       '[data-test-id="associated-record"]',
@@ -365,7 +322,6 @@ export class TasksExtractor {
       }
     }
 
-    // Look for column with "associated" or "record" in header
     const headers = document.querySelectorAll('th, [role="columnheader"]');
     let recordIndex = -1;
     headers.forEach((header, index) => {
@@ -382,22 +338,19 @@ export class TasksExtractor {
     return null;
   }
 
-  /**
-   * Extract and normalize date
-   */
   extractDate(text) {
     if (!text) return '';
     
     const trimmed = text.trim();
     
-    // Handle relative dates
+    // Handle relative dates like "today" or "tomorrow"
     const lowerText = trimmed.toLowerCase();
     if (lowerText === 'today') return 'Today';
     if (lowerText === 'tomorrow') return 'Tomorrow';
     if (lowerText === 'yesterday') return 'Yesterday';
     if (lowerText.includes('overdue')) return trimmed;
 
-    // Try to parse various date formats
+    // Try to match common date formats
     const datePatterns = [
       /\d{4}-\d{2}-\d{2}/,
       /\d{1,2}\/\d{1,2}\/\d{2,4}/,
@@ -416,9 +369,6 @@ export class TasksExtractor {
     return trimmed.substring(0, 20);
   }
 
-  /**
-   * Generate unique ID
-   */
   generateId(element) {
     const text = element.textContent?.substring(0, 100) || '';
     let hash = 0;

@@ -1,13 +1,7 @@
-/**
- * Contacts Extractor
- * Extracts contact data from HubSpot Contacts list view
- * 
- * Target fields: name, email, phone, contact owner
- */
+// Extracts contact data from HubSpot Contacts list view
 
 export class ContactsExtractor {
   constructor() {
-    // CSS selectors for contacts table (ordered by preference)
     this.tableSelectors = [
       '[data-test-id="table"]',
       '[data-selenium-test="table"]',
@@ -24,23 +18,20 @@ export class ContactsExtractor {
     ];
   }
 
-  /**
-   * Extract all contacts from the current page
-   */
   async extract() {
     const contacts = [];
     
-    // Find the table element
+    // Locate the contacts table on the page
     const table = this.findTable();
     if (!table) {
       console.warn('[Contacts Extractor] No table found');
       return contacts;
     }
 
-    // Get all rows
     const rows = this.getRows(table);
     console.log(`[Contacts Extractor] Found ${rows.length} rows`);
 
+    // Process each contact row
     for (const row of rows) {
       try {
         const contact = this.extractContactFromRow(row);
@@ -52,15 +43,11 @@ export class ContactsExtractor {
       }
     }
 
-    // Handle pagination if enabled
     await this.handlePagination(contacts);
 
     return contacts;
   }
 
-  /**
-   * Find the contacts table element
-   */
   findTable() {
     for (const selector of this.tableSelectors) {
       const table = document.querySelector(selector);
@@ -69,14 +56,11 @@ export class ContactsExtractor {
     return null;
   }
 
-  /**
-   * Get all data rows from the table
-   */
   getRows(table) {
     for (const selector of this.rowSelectors) {
       const rows = table.querySelectorAll(selector);
       if (rows.length > 0) {
-        // Filter out header rows
+        // Filter out header rows and empty rows
         return Array.from(rows).filter(row => {
           return !row.closest('thead') && 
                  !row.querySelector('th') &&
@@ -87,28 +71,18 @@ export class ContactsExtractor {
     return [];
   }
 
-  /**
-   * Extract contact data from a single row
-   */
   extractContactFromRow(row) {
     const cells = row.querySelectorAll('td, [role="cell"]');
     if (cells.length < 2) return null;
 
-    // Generate unique ID from row data or use HubSpot's ID
+    // Generate or extract unique identifier for this contact
     const rowId = row.getAttribute('data-row-id') || 
                   row.getAttribute('data-test-id') ||
                   this.generateId(row);
 
-    // Extract name (usually first meaningful column, often has a link)
     const name = this.extractName(row, cells);
-
-    // Extract email
     const email = this.extractEmail(row, cells);
-
-    // Extract phone
     const phone = this.extractPhone(row, cells);
-
-    // Extract owner
     const owner = this.extractOwner(row, cells);
 
     return {
@@ -121,11 +95,8 @@ export class ContactsExtractor {
     };
   }
 
-  /**
-   * Extract contact name
-   */
   extractName(row, cells) {
-    // Try specific selectors first
+    // Try specific selectors first for better accuracy
     const nameSelectors = [
       '[data-test-id="contact-name"]',
       '[data-selenium-test="contact-name"]',
@@ -141,13 +112,11 @@ export class ContactsExtractor {
       }
     }
 
-    // Fallback: First cell with a link
     const firstLink = row.querySelector('td a, [role="cell"] a');
     if (firstLink?.textContent?.trim()) {
       return firstLink.textContent.trim();
     }
 
-    // Fallback: First cell content
     if (cells[0]?.textContent?.trim()) {
       return cells[0].textContent.trim();
     }
@@ -155,11 +124,8 @@ export class ContactsExtractor {
     return null;
   }
 
-  /**
-   * Extract email address
-   */
   extractEmail(row, cells) {
-    // Try specific selectors
+    // Look for email in specific data attributes or mailto links
     const emailSelectors = [
       '[data-test-id="email"]',
       '[data-selenium-test="email"]',
@@ -180,7 +146,7 @@ export class ContactsExtractor {
       }
     }
 
-    // Fallback: Search all cells for email pattern
+    // Search all cells for email pattern
     const emailPattern = /[\w.-]+@[\w.-]+\.\w+/;
     for (const cell of cells) {
       const text = cell.textContent;
@@ -191,11 +157,8 @@ export class ContactsExtractor {
     return null;
   }
 
-  /**
-   * Extract phone number
-   */
   extractPhone(row, cells) {
-    // Try specific selectors
+    // Look for phone in specific data attributes or tel links
     const phoneSelectors = [
       '[data-test-id="phone"]',
       '[data-selenium-test="phone"]',
@@ -217,7 +180,7 @@ export class ContactsExtractor {
       }
     }
 
-    // Fallback: Search cells for phone pattern
+    // Search cells for phone pattern
     const phonePattern = /[\d\s\-\(\)\+]{7,}/;
     for (const cell of cells) {
       const text = cell.textContent?.trim();
@@ -230,11 +193,7 @@ export class ContactsExtractor {
     return null;
   }
 
-  /**
-   * Extract contact owner
-   */
   extractOwner(row, cells) {
-    // Try specific selectors
     const ownerSelectors = [
       '[data-test-id="owner"]',
       '[data-test-id="contact-owner"]',
@@ -250,7 +209,7 @@ export class ContactsExtractor {
       }
     }
 
-    // Fallback: Look for column with "owner" in header
+    // Look for column with "owner" in header
     const headers = document.querySelectorAll('th, [role="columnheader"]');
     let ownerIndex = -1;
     headers.forEach((header, index) => {
@@ -266,18 +225,14 @@ export class ContactsExtractor {
     return null;
   }
 
-  /**
-   * Check if string looks like a phone number
-   */
   looksLikePhone(str) {
+    // Check if string has a reasonable number of digits for a phone number
     const digits = str.replace(/\D/g, '');
     return digits.length >= 7 && digits.length <= 15;
   }
 
-  /**
-   * Generate unique ID for a row
-   */
   generateId(row) {
+    // Create a simple hash from row content for unique ID
     const text = row.textContent?.substring(0, 100) || '';
     let hash = 0;
     for (let i = 0; i < text.length; i++) {
@@ -288,11 +243,7 @@ export class ContactsExtractor {
     return `contact-${Math.abs(hash)}`;
   }
 
-  /**
-   * Handle pagination to extract all pages
-   */
   async handlePagination(contacts) {
-    // Look for pagination controls
     const nextButton = document.querySelector(
       '[data-test-id="pagination-next"],' +
       '[aria-label="Next page"],' +
@@ -300,7 +251,6 @@ export class ContactsExtractor {
       'button[data-selenium-test="pagination-button-next"]'
     );
 
-    // For now, just extract current page
     // Full pagination could be implemented by clicking next and re-extracting
     if (nextButton && !nextButton.disabled) {
       console.log('[Contacts Extractor] More pages available');

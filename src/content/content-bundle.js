@@ -1,12 +1,5 @@
-/**
- * Bundled Content Script for HubSpot CRM Extractor
- * This file combines all content script modules into a single file
- * for Chrome Extension compatibility (content scripts don't support ES modules)
- */
-
-// ============================================
-// STATUS INDICATOR (Shadow DOM)
-// ============================================
+// Content script for HubSpot CRM Extractor
+// Combines all extraction modules into a single bundle for Chrome Extension compatibility
 
 class StatusIndicator {
   constructor() {
@@ -16,6 +9,7 @@ class StatusIndicator {
   }
 
   createContainer() {
+    // Create a shadow DOM container for isolated styling
     if (this.container) return;
 
     this.container = document.createElement('div');
@@ -106,8 +100,9 @@ class StatusIndicator {
     document.body.appendChild(this.container);
   }
 
-  show(status, message) {
+  show(message, type = 'info') {
     this.createContainer();
+    // Display status message to user
 
     const icons = {
       extracting: '<div class="spinner"></div>',
@@ -117,9 +112,9 @@ class StatusIndicator {
     };
 
     const indicator = document.createElement('div');
-    indicator.className = `status-indicator ${status}`;
+    indicator.className = `status-indicator ${type}`;
     indicator.innerHTML = `
-      ${icons[status] || icons.extracting}
+      ${icons[type] || icons.extracting}
       <span class="message">${this.escapeHtml(message)}</span>
       <button class="close-btn" aria-label="Close">×</button>
     `;
@@ -134,7 +129,7 @@ class StatusIndicator {
 
     chrome.runtime.sendMessage({
       type: 'EXTRACTION_STATUS',
-      payload: { status, message }
+      payload: { status: type, message }
     }).catch(() => {});
   }
 
@@ -156,10 +151,6 @@ class StatusIndicator {
     return div.innerHTML;
   }
 }
-
-// ============================================
-// CONTACTS EXTRACTOR
-// ============================================
 
 class ContactsExtractor {
   constructor() {
@@ -308,10 +299,6 @@ class ContactsExtractor {
     return `contact-${Math.abs(hash)}`;
   }
 }
-
-// ============================================
-// DEALS EXTRACTOR
-// ============================================
 
 class DealsExtractor {
   constructor() {
@@ -487,10 +474,6 @@ class DealsExtractor {
   }
 }
 
-// ============================================
-// TASKS EXTRACTOR
-// ============================================
-
 class TasksExtractor {
   constructor() {
     this.tableSelectors = [
@@ -637,12 +620,9 @@ class TasksExtractor {
   }
 }
 
-// ============================================
-// MAIN EXTRACTOR
-// ============================================
-
 class HubSpotExtractor {
   constructor() {
+    // Initialize status indicator and all data extractors
     this.statusIndicator = new StatusIndicator();
     this.extractors = {
       contacts: new ContactsExtractor(),
@@ -670,6 +650,7 @@ class HubSpotExtractor {
   }
 
   detectCurrentView() {
+    // Determine which HubSpot view we're on (contacts, deals, or tasks)
     const url = window.location.href;
     const pathname = window.location.pathname;
 
@@ -743,6 +724,7 @@ class HubSpotExtractor {
   }
 
   async waitForContent(view) {
+    // Wait for dynamic content to load before extracting
     const selectors = {
       contacts: '[data-test-id="table"], .private-table, table',
       deals: '[data-test-id="table"], .private-table, .deal-board, table',
@@ -750,7 +732,7 @@ class HubSpotExtractor {
     };
 
     const selector = selectors[view];
-    const maxWait = 10000;
+    const maxWait = 5000;
     const interval = 500;
     let elapsed = 0;
 
@@ -766,7 +748,7 @@ class HubSpotExtractor {
   }
 }
 
-// Initialize
+// Initialize the extractor when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     const extractor = new HubSpotExtractor();

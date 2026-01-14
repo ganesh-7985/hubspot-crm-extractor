@@ -1,18 +1,12 @@
-/**
- * Service Worker for HubSpot CRM Extractor (Bundled)
- * Handles message passing between content scripts and popup
- * Manages storage operations and coordinates extraction across tabs
- */
-
-// ============================================
-// STORAGE MANAGER
-// ============================================
+// Service Worker for HubSpot CRM Extractor
+// Handles message passing, storage operations, and cross-tab coordination
 
 const LOCK_TIMEOUT = 30000;
 const STORAGE_KEY = 'hubspot_data';
 const LOCK_KEY = 'extraction_lock';
 
 async function initializeStorage() {
+  // Check if storage already has data structure
   const existing = await getAllData();
   if (!existing || !existing.contacts) {
     await chrome.storage.local.set({
@@ -41,27 +35,39 @@ async function getAllData() {
   };
 }
 
+/**
+ * Acquire a mutex lock for the given tab to prevent race conditions.
+ * @param {number} tabId
+ * @returns {Promise<boolean>}
+ */
 async function acquireLock(tabId) {
+  // Try to acquire mutex lock for this tab to prevent race conditions
   const result = await chrome.storage.local.get(LOCK_KEY);
-  const lock = result[LOCK_KEY];
-
-  if (lock?.tabId && lock?.timestamp) {
-    const elapsed = Date.now() - lock.timestamp;
-    if (elapsed < LOCK_TIMEOUT) {
-      return false;
-    }
+  const lock = result[LOCK_KEY] || { tabId: null, timestamp: null };
+  const now = Date.now();
+  
+  // Check if lock is expired or available
+  const elapsed = lock.timestamp ? now - lock.timestamp : LOCK_TIMEOUT + 1;
+  if (elapsed < LOCK_TIMEOUT) {
+    return false;
   }
 
+  // Acquire the lock
   await chrome.storage.local.set({
     [LOCK_KEY]: {
       tabId: tabId,
-      timestamp: Date.now()
+      timestamp: now
     }
   });
 
   return true;
 }
 
+/**
+ * Release the mutex lock for the given tab.
+ * @param {number} tabId
+ * @returns {Promise<boolean>}
+ */
 async function releaseLock(tabId) {
   const result = await chrome.storage.local.get(LOCK_KEY);
   const lock = result[LOCK_KEY];
@@ -77,18 +83,23 @@ async function releaseLock(tabId) {
   return true;
 }
 
-function mergeRecords(existing, incoming) {
-  const recordMap = new Map();
+/**
+ * Merge existing records with incoming records, deduplicating by ID.
+ * @param {Array} existing
+ * @param {Array} incoming
+ * @param {string} type
+ * @returns {Array}
+ */
+function mergeRecords(existing, incoming, type) {
+  // Create a map for efficient deduplication by ID
+  const recordMap = new Map(existing.map(item => [item.id, item]));
 
-  existing.forEach(record => {
-    recordMap.set(record.id, record);
-  });
-
-  incoming.forEach(record => {
-    if (record.id) {
-      recordMap.set(record.id, {
-        ...recordMap.get(record.id),
-        ...record,
+  // Only add new items that don't already exist
+  incoming.forEach(item => {
+    if (!recordMap.has(item.id)) {
+      recordMap.set(item.id, {
+        ...recordMap.get(item.id),
+        ...item,
         updatedAt: Date.now()
       });
     }
@@ -97,6 +108,12 @@ function mergeRecords(existing, incoming) {
   return Array.from(recordMap.values());
 }
 
+/**
+ * Save data to storage, deduplicating by ID.
+ * @param {string} dataType
+ * @param {Array} newData
+ * @returns {Promise<{success: boolean, added: number, total: number}>}
+ */
 async function saveData(dataType, newData) {
   if (!['contacts', 'deals', 'tasks'].includes(dataType)) {
     return { success: false, error: 'Invalid data type' };
@@ -105,7 +122,7 @@ async function saveData(dataType, newData) {
   const currentData = await getAllData();
   const existingRecords = currentData[dataType] || [];
 
-  const mergedData = mergeRecords(existingRecords, newData);
+  const mergedData = mergeRecords(existingRecords, newData, dataType);
 
   currentData[dataType] = mergedData;
   currentData.lastSync = Date.now();
@@ -121,6 +138,12 @@ async function saveData(dataType, newData) {
   };
 }
 
+/**
+ * Delete a record from storage by ID.
+ * @param {string} dataType
+ * @param {string} recordId
+ * @returns {Promise<{success: boolean, error: string}>}
+ */
 async function deleteRecord(dataType, recordId) {
   if (!['contacts', 'deals', 'tasks'].includes(dataType)) {
     return { success: false, error: 'Invalid data type' };
@@ -145,6 +168,10 @@ async function deleteRecord(dataType, recordId) {
   return { success: true };
 }
 
+/**
+ * Clear all data from storage.
+ * @returns {Promise<{success: boolean}>}
+ */
 async function clearAllData() {
   await chrome.storage.local.set({
     [STORAGE_KEY]: {
@@ -157,6 +184,10 @@ async function clearAllData() {
   return { success: true };
 }
 
+/**
+ * Get the current sync status.
+ * @returns {Promise<{lastSync: number, counts: {contacts: number, deals: number, tasks: number}}>}
+ */
 async function getSyncStatus() {
   const data = await getAllData();
   return {
@@ -169,21 +200,24 @@ async function getSyncStatus() {
   };
 }
 
-// ============================================
-// MESSAGE HANDLERS
-// ============================================
-
+// Listen for messages from popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   handleMessage(message, sender).then(sendResponse);
   return true;
 });
 
+/**
+ * Handle incoming messages from popup and content scripts.
+ * @param {object} message
+ * @param {object} sender
+ * @returns {Promise<object>}
+ */
 async function handleMessage(message, sender) {
   const { type, payload } = message;
 
   switch (type) {
     case 'EXTRACT_DATA':
-      return await handleExtractData(sender.tab?.id);
+      return await handleExtractData(payload, sender.tab?.id);
 
     case 'SAVE_EXTRACTED_DATA':
       return await handleSaveData(payload);
@@ -215,7 +249,13 @@ async function handleMessage(message, sender) {
   }
 }
 
-async function handleExtractData(tabId) {
+/**
+ * Handle extract data request.
+ * @param {object} payload
+ * @param {number} tabId
+ * @returns {Promise<object>}
+ */
+async function handleExtractData(payload, tabId) {
   if (!tabId) {
     return { success: false, error: 'No active tab found' };
   }
@@ -230,6 +270,11 @@ async function handleExtractData(tabId) {
   }
 }
 
+/**
+ * Handle save data request.
+ * @param {object} payload
+ * @returns {Promise<object>}
+ */
 async function handleSaveData(payload) {
   const { dataType, data, tabId } = payload;
   
@@ -304,10 +349,7 @@ function convertToCSV(data) {
   return sections.join('\n');
 }
 
-// ============================================
-// STORAGE CHANGE LISTENER (Real-time sync)
-// ============================================
-
+// Broadcast storage changes to all tabs for real-time sync
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes.hubspot_data) {
     chrome.runtime.sendMessage({
@@ -317,10 +359,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   }
 });
 
-// ============================================
-// INSTALLATION HANDLER
-// ============================================
-
+// Initialize storage when extension is first installed
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     console.log('HubSpot CRM Extractor installed');
