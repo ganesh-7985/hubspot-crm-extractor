@@ -10,6 +10,10 @@ A Chrome Extension that extracts Contacts, Deals, and Tasks from HubSpot CRM usi
 ![Data Extraction in Action](icons/img2.png)
 *Real-time extraction status indicator on HubSpot CRM pages*
 
+## Demo Video
+
+📹 **Watch the extension in action**: [YouTube Demo](https://youtu.be/qn2V4MEehEw)
+
 ## Features
 
 ### Core Functionality
